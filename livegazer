@@ -1,0 +1,79 @@
+#!/usr/bin/env ruby
+# encoding: utf-8
+
+require 'gtk2'
+require 'monitor'
+require 'yaml'
+require './crawler'
+require './extractors'
+
+# NOTE: похоже каждая нить должна уметь обрабатывать исключения, иначе
+# они вылетают и непонятно, что произошло
+
+# Расширение gtk для работы в нескольких нитях
+module Gtk
+   GTK_PENDING_BLOCKS = []
+   GTK_PENDING_BLOCKS_LOCK = Monitor.new
+
+   # Выполнить блок в основной (используемой gtk) нити
+   def Gtk.queue &block
+      if Thread.current == Thread.main
+         block.call
+      else
+         GTK_PENDING_BLOCKS_LOCK.synchronize do
+            GTK_PENDING_BLOCKS << block
+         end
+      end
+   end
+
+   # Старт gtk с проверкой очереди блоков на выполнение в основной нити каждые 100ms
+   def Gtk.main_with_queue timeout
+      Gtk.timeout_add timeout do
+         GTK_PENDING_BLOCKS_LOCK.synchronize do
+            for block in GTK_PENDING_BLOCKS
+               block.call
+            end
+            GTK_PENDING_BLOCKS.clear
+         end
+         true
+      end
+      Gtk.main
+   end
+end
+
+config = YAML.load_file("livegazerrc")
+
+crawler = Crawler.new
+extractors = {}
+config.each do |site|
+   crawler.add(site["url"], site["period"], site["login"])
+   status=Gtk::StatusIcon.new
+   status.file = site["icons"]["old"]
+   status.tooltip_markup = "<b>#{site["title"]}</b>"
+   extractor = Object.const_get("#{site["extractor"].capitalize}Extractor".to_sym).new
+   status.signal_connect('activate') do |icon|
+      icon.file = site["icons"]["old"]
+      icon.tooltip_markup = "<b>#{site["title"]}</b>"
+      extractor.clear
+   end
+   extractor.on_change do
+      Gtk.queue do 
+         status.file = site["icons"]["new"]
+         status.tooltip_markup = "<b>#{site["title"]}</b>\n#{extractor.summary}"
+      end
+   end
+   extractors[site["url"]] = extractor
+end
+
+Thread.new do
+   begin
+      crawler.queue do |url, data|
+         extractors[url].push(data)
+      end
+   rescue
+      puts "Worker thread error: #$!\n#{$!.backtrace.join("\n")}"
+      exit
+   end
+end
+
+Gtk.main_with_queue 100
