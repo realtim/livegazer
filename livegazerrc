@@ -1,0 +1,19 @@
+# vim: ft=yaml
+# This is YAML config file
+# To trace your friends page on Livejournal put your username and
+# password instead of uuu and ppp. If you want to trace only public
+# posts of your friends you can delete the entire "login" section.
+-
+   title: "Livejournal Friends"
+   url: "http://uuu.livejournal.com/friends"
+   period: 60
+   extractor: livejournal
+   icons:
+      new: "lj-active.png"
+      old: "lj-passive.png"
+   login:
+      url: "https://www.livejournal.com/login.bml?ret=1"
+      method: "post"
+      data:
+         "user": "uuu"
+         "password": "ppp"
