@@ -102,6 +102,8 @@ class Crawler
             end
          rescue
             puts "Fetcher [#{url}] error: #$!\n#{$!.backtrace.join("\n")}"
+            puts "Retrying..."
+            retry
          end
       end
    end
