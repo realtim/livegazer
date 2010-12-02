@@ -108,16 +108,6 @@ class LivejournalExtractor
       data.reverse_each do |post|
          md5 = Digest::MD5.hexdigest(post.to_s)
          next if @known.include?(md5)
-         unless notify
-            @data.synchronize do
-               @data.each do |p|
-                  p["time_seen"] = true
-                  p["subject_seen"] = true
-                  p["text_seen"] = true
-                  p["comments_seen"] = true
-               end
-            end
-         end
          notify = true
          @known << md5
          i = @data.find_index {|p| p["url"] == post["url"]}
@@ -142,6 +132,8 @@ class LivejournalExtractor
                   @data[i].delete("text_seen")
                end
                if @data[i]["comments"] != post["comments"]
+                  # XXX Видимо где-то все-таки проблема с синхронизацией,
+                  # вылетел на следующей строчке с @data[i] == nil
                   @data[i]["comments"] = post["comments"]
                   @data[i].delete("comments_seen")
                end
@@ -157,6 +149,10 @@ class LivejournalExtractor
       @data.synchronize do
          @data.each do |post|
             post["hide"] = true
+            post["time_seen"] = true
+            post["subject_seen"] = true
+            post["text_seen"] = true
+            post["comments_seen"] = true
          end
          # Чтобы не хранить посты вечно
          # TODO Возможно подчищать надо не только тут
