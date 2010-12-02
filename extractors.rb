@@ -103,7 +103,9 @@ class LivejournalExtractor
       require "digest/md5"
       data = parse(text)
       notify = false
-      data.each do |post|
+      # Перебираем записи в обратном порядке, чтобы более старыми
+      # считались те, что ниже
+      data.reverse_each do |post|
          md5 = Digest::MD5.hexdigest(post.to_s)
          next if @known.include?(md5)
          unless notify
@@ -119,6 +121,8 @@ class LivejournalExtractor
          notify = true
          @known << md5
          i = @data.find_index {|p| p["url"] == post["url"]}
+         # Запомниаем время для сортировки по новизне
+         post["update"] = Time.now
          @data.synchronize do
             if i
                # was: data[i] = post
@@ -131,6 +135,8 @@ class LivejournalExtractor
                   @data[i]["subject"] = post["subject"]
                   @data[i].delete("subject_seen")
                end
+               # TODO Дальше здесь можно сохранять text_summary в
+               # отдельное поле, с разметкой для подсвечивания изменений
                if @data[i]["text"] != post["text"]
                   @data[i]["text"] = post["text"]
                   @data[i].delete("text_seen")
@@ -139,6 +145,7 @@ class LivejournalExtractor
                   @data[i]["comments"] = post["comments"]
                   @data[i].delete("comments_seen")
                end
+               data[i]["update"] = post["update"]
             else
                @data << post
             end
@@ -157,15 +164,39 @@ class LivejournalExtractor
       end
    end
    def summary
-      @data.select{|post| !post["hide"]}.map do |post|
-         "#{post["time_seen"] ? "<span fgcolor=\"#777777\">" : ""}#{post["time"]}#{post["time_seen"] ? "</span>" : ""}\n"\
-         "<span fgcolor=\"#007000\"><i>#{post["user"]}</i></span>"\
-         " #{post["subject_seen"] ? "<span fgcolor=\"#777777\">" : ""}<b>#{post["subject"]}</b>#{post["subject_seen"] ? "</span>" : ""}\n"\
-         "#{post["text_seen"] ? "<span fgcolor=\"#777777\">" : ""}#{post["text"]}#{post["text_seen"] ? "</span>" : ""}"\
-         "#{post["comments"] ? (post["comments_seen"] ? "\n<span fgcolor=\"#777777\">{#{post["comments"]}}</span>" : "\n{#{post["comments"]}}") : ""}"
+      # Показываются только обновленные посты, более новые снизу
+      @data.select{|post| !post["hide"]}.sort{|a, b| a["update"] <=> b["update"]}.map do |post|
+         "#{gray_if(post["time_seen"]){ post["time"] }}\n"\
+         "#{green{ "<i>#{post["subuser"].empty? ? post["user"] : "#{post["subuser"]} [#{post["user"]}]"}</i>" }}"\
+         " #{gray_if(post["subject_seen"]){ "<b>#{post["subject"]}</b>" }}\n"\
+         "#{post["text_seen"] ? gray{ truncate(100){ post["text"] }} : truncate(256){ post["text"] }}"\
+         "#{gray_if(post["comments_seen"]){ "\n{#{post["comments"]}}" } if post["comments"]}"
       end.join("\n\n")
    end
 protected
+   # Summary
+   def truncate len
+      str = yield
+      str = str[0...len].sub(/ [^ ]*$/, '') + " ..." if str.size > len
+      str
+   end
+   def green
+      "<span fgcolor=\"#007000\">#{yield}</span>"
+   end
+   def gray
+      "<span fgcolor=\"#777777\">#{yield}</span>"
+   end
+   def gray_if test
+      if test
+         gray{ yield }
+      else
+         yield
+      end
+   end
+   # Парсинг
+   def flatten str
+      str.gsub(/<[^>]*>/, ' ').gsub(/&amp;/, '&').gsub(/&[a-zA-Z0-9]*;/, '').gsub(/&/, '&amp;').gsub(/\n/, ' ').squeeze(" ")
+   end
    def parse text
       require 'hpricot'
       doc = Hpricot(text)
@@ -176,16 +207,13 @@ protected
             "url" => (post/"td.metabar/p/a").first["href"],
             "time" => (post/"td.metabar/em").inner_html.force_encoding("utf-8"),
             "user" => (post/"td.metabar/strong/a").inner_html.force_encoding("utf-8"),
-            "subject" => (post/"td.entry/span.subject/a").inner_html.force_encoding("utf-8"),
-            "text" => (post/"td.entry").inner_html.force_encoding("utf-8").
+            "subuser" => (post/"td.metabar/a").inner_html.force_encoding("utf-8"),
+            "subject" => flatten((post/"td.entry/span.subject/a").inner_html.force_encoding("utf-8")),
+            "text" => flatten((post/"td.entry").inner_html.force_encoding("utf-8").
                       gsub((post/"td.entry/span").first.to_s.force_encoding("utf-8"), '').
                       gsub((post/"td.entry/p.comments").last.to_s.force_encoding("utf-8"), '').
-                      gsub(/<a [^>]*href[^>]*>/im, '@').
-                      gsub(/<img [^>]*>/im, '[IMG]').
-                      gsub(/<[^>]*>/, ' ').
-                      gsub(/&[a-zA-Z0-9]*;/, '').
-                      gsub(/\n/, ' ').
-                      squeeze(" "),
+                      gsub(/<a [^>]*href[^>]*>/im, ' @').
+                      gsub(/<img [^>]*>/im, ' [IMG] ')),
             "comments" => (post/"td.entry/p.comments/a").first["href"].force_encoding("utf-8").scan(/nc=(\d+)/).flatten[0]
          }
       end
