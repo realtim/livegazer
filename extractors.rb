@@ -106,40 +106,51 @@ class LivejournalExtractor
       # Перебираем записи в обратном порядке, чтобы более старыми
       # считались те, что ниже
       data.reverse_each do |post|
+         # XXX возможно достаточно сравнивать только с теми записями,
+         # которые сейчас в data. И уж наверное стоит очищать @known.
          md5 = Digest::MD5.hexdigest(post.to_s)
          next if @known.include?(md5)
-         notify = true
          @known << md5
          i = @data.find_index {|p| p["url"] == post["url"]}
          # Запомниаем время для сортировки по новизне
          post["update"] = Time.now
          @data.synchronize do
             if i
-               # was: data[i] = post
-               @data[i].delete("hide")
+               # was: @data[i] = post
                if @data[i]["time"] != post["time"]
                   @data[i]["time"] = post["time"]
                   @data[i].delete("time_seen")
+                  @data[i].delete("hide")
+                  notify = true
                end
                if @data[i]["subject"] != post["subject"]
                   @data[i]["subject"] = post["subject"]
                   @data[i].delete("subject_seen")
+                  @data[i].delete("hide")
+                  notify = true
                end
                # TODO Дальше здесь можно сохранять text_summary в
                # отдельное поле, с разметкой для подсвечивания изменений
                if @data[i]["text"] != post["text"]
                   @data[i]["text"] = post["text"]
                   @data[i].delete("text_seen")
+                  @data[i].delete("hide")
+                  notify = true
                end
                if @data[i]["comments"] != post["comments"]
                   # XXX Видимо где-то все-таки проблема с синхронизацией,
                   # вылетел на следующей строчке с @data[i] == nil
                   @data[i]["comments"] = post["comments"]
                   @data[i].delete("comments_seen")
+                  @data[i].delete("hide")
+                  notify = true
                end
-               data[i]["update"] = post["update"]
+               # XXX
+               raise "Debug exception. This shouldn't happen.\nknown: #{@data[i]}\npost: #{post}" unless notify
+               @data[i]["update"] = post["update"]
             else
                @data << post
+               notify = true
             end
          end
       end
@@ -207,10 +218,10 @@ protected
             "subject" => flatten((post/"td.entry/span.subject/a").inner_html.force_encoding("utf-8")),
             "text" => flatten((post/"td.entry").inner_html.force_encoding("utf-8").
                       gsub((post/"td.entry/span").first.to_s.force_encoding("utf-8"), '').
-                      gsub((post/"td.entry/p.comments").last.to_s.force_encoding("utf-8"), '').
+                      gsub((post/"td.entry//p.comments").last.to_s.force_encoding("utf-8"), '').
                       gsub(/<a [^>]*href[^>]*>/im, ' @').
                       gsub(/<img [^>]*>/im, ' [IMG] ')),
-            "comments" => (post/"td.entry/p.comments/a").first["href"].force_encoding("utf-8").scan(/nc=(\d+)/).flatten[0]
+            "comments" => (post/"td.entry//p.comments/a").first["href"].force_encoding("utf-8").scan(/nc=(\d+)/).flatten[0]
          }
       end
       result
