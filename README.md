@@ -64,9 +64,7 @@ from. Extractors are major extensions of *livegazer*.
 Возможно сделать возможность указать метод логина и как передавать
 сессию (cookie, get).
 
-Показывать максимально удобно diff.
-
-Можно писать лог всех зафиксированных состояний текстов.
+Показывать максимально удобно diff. Можно писать лог всех зафиксированных состояний текстов.
 
 Можно сделать различные управляющие воздействия:
 
@@ -143,6 +141,11 @@ from. Extractors are major extensions of *livegazer*.
 Сделать описание и список доделок для github.
 Придумать лицензию.
 
+Можно сделать указание иконок тоже URL-ом.
+
+Возможно отдельный конфиг для сайтов и отдельный для настроек (например
+действия при щелчке мыши).
+
 # Проектирование
 
 ## Модули
@@ -189,15 +192,15 @@ from. Extractors are major extensions of *livegazer*.
 
 ## Данные
 
-      Накопленная история
+Накопленная история
 
 ## Нити
 
-      Для начала по нити на URL, занимаются исключительно скачиванием.
+Для начала по нити на URL, занимаются исключительно скачиванием.
 
-      Нить для подготовки данных для пользователя
+Нить для подготовки данных для пользователя
 
-      Основная нить с графическим интерфейсом
+Основная нить с графическим интерфейсом
 
 # TODO
 
@@ -210,9 +213,11 @@ from. Extractors are major extensions of *livegazer*.
 * Installation procedure
 * First start procedure
 * Надежная загрузка конфигурационного файла
+    * Отсутствие файла
     * Ошибки формата
     * Период по умолчанию
     * Иконки по умолчанию
+    * Отсутствие файлов иконок
     * Extractor по умолчанию
 
 # BUGS
@@ -224,83 +229,3 @@ from. Extractors are major extensions of *livegazer*.
 [Pango format](http://library.gnome.org/devel/pango/stable/PangoMarkupFormat.html) for `tooltip_markup`.
 
 [Gtk::StatusIcon Description](http://ruby-gnome2.sourceforge.jp/hiki.cgi?Gtk%3A%3AStatusIcon).
-
-# Куски кода для раздумий
-
-    ########## Config
-    #CONFIG_FILE=File.expand_path("~/.site-checker/config")
-    #load(CONFIG_FILE) if File.exist?(CONFIG_FILE)
-    #raise "URL для проверки не задана" unless defined?(CHECK_URL)
-    #CHECK_INTERVAL=60000 unless defined?(CHECK_INTERVAL)
-    #unless defined?(PASSIVE_ICON) && File.exist?(PASSIVE_ICON)
-    #   raise "Изображение для пассивного режима не задано"
-    #end
-    #unless defined?(ACTIVE_ICON) && File.exist?(ACTIVE_ICON)
-    #   raise "Изображение для активного режима не задано"
-    #end
-    #unless defined?(TOOLTIP_FORMAT)
-    #   TOOLTIP_FORMAT="{Last change: %t[%H:%M]\nChanges: %c\n}<b>MD5</b>: %m"
-    #end
-
-    ##########
-    #   tip=TOOLTIP_FORMAT.dup
-    #   if $history.size>1
-    #      $history[1..-1].reverse_each do |change|
-    #         tip.gsub!(/\{([^}]*)\}/) do |match|
-    #            t=$1.dup
-    #            t.gsub!(/%m/, change["md5"].to_s)
-    #            t.gsub!(/%t\[([^\]]*)\]/){change["time"].strftime($1)}
-    #            t.gsub!(/%d\[([^\]]*)\]/){
-    #               dm=$1
-    #               change["diff"].map{|dc| dm.gsub(/%D/, dc.gsub(/%n/, "\n"))}.join
-    #            }
-    #            t+match
-    #         end
-    #      end
-    #      tip.gsub!(/\{[^}]*\}/,'')
-    #   else
-    #      tip.gsub!(/\{[^}]*\}/,'')
-    #   end
-    #   tip.gsub!(/%c/, ($history.size-1).to_s)
-
-    ##########
-    #$tray.add_events(Gdk::Event::BUTTON_PRESS_MASK)
-    #$tray.signal_connect("button-press-event") do
-    #   $history = [ $history.last ]
-    #   update_status
-    #   if defined?(CLICK_COMMAND)=="constant" && !CLICK_COMMAND.nil?
-    #      system(CLICK_COMMAND) 
-    #   end
-    #end
-
-    ##########
-    #         if defined?(SUBSTITUTIONS)
-    #            SUBSTITUTIONS.each{|from,to| data.gsub!(from, to)}
-    #         end
-
-    ##########
-    #         elsif md5!=$history.last["md5"]
-    #            diff=Diff::LCS.diff($history.last["data"], data).flatten
-    #            diff=diff.find_all{|i| i.action=="+"}
-    #            diff=diff.map{|c| c.element}
-    #            changed=true
-    #         end
-    #         if changed
-    #            $history << {"time"=>Time.new,
-    #                  "data"=>data,
-    #                  "diff"=>diff,
-    #                  "md5"=>md5}
-    #            update_status
-    #         end
-
-    ##########
-    #   rescue EOFError, Timeout::Error, Errno::ECONNRESET, SocketError, Errno::ETIMEDOUT, Errno::EHOSTUNREACH
-    #      # ничего не делаю, пусть сам попробует заново после таймаута
-    #   end
-
-    ## список тем постов:
-    ## subjects=data.scan(/<span class="subject">(((?!<\/span>).)*)<\/span>/m).map{|e| e[0]}
-    ## subjects.gsub!(/<[^>]*>/,'') # чтобы ссылки там всякие убрать
-
-    ## список писавших:
-    ## users=r.scan(/\[<a href="http:\/\/www.livejournal.com\/users\/(\w+)\/\d+.html">Link<\/a>\]/).map{|e| e[0]}
