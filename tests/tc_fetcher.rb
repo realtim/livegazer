@@ -60,9 +60,7 @@ class TestFetcher < Test::Unit::TestCase
                         "Username" => "admin",
                         "action_dologin" => "Log in"
                      }
-      text = fetcher.get
-      File.open("text", "w"){|f| f.write(text)}
-      assert_match(/Page Version History/, text)
+      assert_match(/Page Version History/, fetcher.get)
    end
 
 ## TODO
