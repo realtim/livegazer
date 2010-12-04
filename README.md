@@ -36,7 +36,7 @@ Obligatory fields:
 * Extractor -- plugin for handling webpage content -- look below *(extractor)*
 
 Optional are fields regarding login information (some webpages doesn't
-require login). Login fields are under *(login)*:
+require login). Login fields are under *login*:
 
 * Login url -- where login and password are posted *(url)*
 * Login data -- number of key-value pairs to send -- username and
