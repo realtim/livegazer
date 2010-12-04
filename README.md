@@ -1,15 +1,12 @@
 *README is partially in russian as it was (totaly russian) initially*
 
-*livegazer* is a program to track changes on HTTP site.
+*livegazer* is a program to track changes on HTTP sites.
 
-# Goals
+It's goals are:
 
-*livegazer* полезен, чтобы не торчать все время в ЖЖ, а быстро вычитывать
-новое, только существенное. Возможно чтобы в `otdam_darom` отлавливать
-посты с ключевыми словами чтобы оперативно реагировать на новое.
-
-*livegazer* не предполагается на данный момент как инструмент для удобного
-просмотра журнала с картинками.
+* Track changes important to user
+* Rapidly notify about updates
+* Save user's time and attention
 
 # Description
 
@@ -20,28 +17,62 @@ icon. Upon update it contains summary of what happened.
 
 When started *livegazer* reads config file (livegazerrc for now).
 Config file has [YAML](http://yaml.org) format.
-It contains array of settings. Each setting describes URL for tracking
-and miscellaneous parameters such as update period and login
+It contains array of sections. Each section describes URL for tracking
+and miscellaneous settings such as update period and login
 information (if there is some actions user have to do in order to access
-the URL). For each setting an icon is created in tray.
+the URL). For each section an icon is created in tray.
 
-# Done
+# Configuration
 
-## Configuration
+Each section is started with "-" in first column (as array item in
+YAML).
 
-     Обязательные настройки для сайта:
-        URL
-     Дополнительные:
-        период 
-        иконки
-        атрибуты логина:
-           URL
-           логин
-           пароль
-     Расширенные:
-        настройка извлечения текста
+Obligatory fields:
 
-## Structure
+* URL *(url)*
+* Title *(title)*
+* Update period *(period)*
+* Icons *(icon/new,old)*
+* Extractor -- plugin for handling webpage content -- look below *(extractor)*
+
+Optional are fields regarding login information (some webpages doesn't
+require login). Login fields are under *(login)*:
+
+* Login url -- where login and password are posted *(url)*
+* Login data -- number of key-value pairs to send -- username and
+  password for example *(data)*
+
+Example:
+
+    -
+       title: "Livejournal Friends"
+       url: "http://uuu.livejournal.com/friends"
+       period: 60
+       extractor: livejournal
+       icons:
+          new: "lj-active.png"
+          old: "lj-passive.png"
+       login:
+          url: "https://www.livejournal.com/login.bml?ret=1"
+          data:
+             "user": "uuu"
+             "password": "ppp"
+
+# Extractors
+
+Extractor contains main update logic. It knows how to extract important
+data from webpage and how to generate the summary.
+
+For now there are some simple extractors:
+
+* *plain* -- only drops HTML tags
+* *sub* -- drops scripts and HTML entities also
+* *lj* -- drops ads and some Livejournal special non-important markup
+  data
+* *livejournal* -- most thoroughly extractor for livejournal friends
+  pages
+
+# Internal design
 
 Fetcher downloads a webpage logging in if needed. It can also check
 whether there are updates available using basic HTTP properties such as
@@ -49,14 +80,67 @@ Last-Modified or (in future probably) Etag (by HEAD request).
 
 Crawler controls fetchers. It serves the task of simultaneous download of
 multiple pages. Each fetcher is run in separate thread and crawler
-restarts fetchers if there are network errors.
+restarts fetchers if there are network errors. When webpage is updated at
+binary level crawler pushes it to extractor.
 
 Extractor manages history of a page. It can parse page updates and
 generates update summaries. And it stores history in appropriate data
 structure. As such there may be different extractors for user to choose
 from. Extractors are major extensions of *livegazer*.
 
-# Идеи
+The rest is main program with user interface. It reads configs and
+initializes modules, displays summaries, changes tray icons and routes
+user interactions.
+
+## Actions
+
+* Initialization -- *main*
+* Page download -- *crawler*
+* Data extraction -- *extractor*
+* Data comparison -- *extractor*
+* Summary generation -- *extractor*
+* User interface -- *main*
+
+## Data
+
+* Page history -- *extractor*
+* Config -- *main*
+
+## Threads
+
+* Each fetcher
+* Work thread (extractors)
+* Main thread (UI)
+
+# TODO
+
+* Documentation
+    * Config format
+    * Comments
+    * Description (user and developer)
+* Translate to english
+* Handsome site config (probably during program work)
+* Installation procedure
+* First start procedure
+* Reliable configuration file loading
+    * Missing config
+    * Parse errors
+    * Period, icons and extractor by default
+    * Missing icon files
+
+# BUGS
+
+* `<lj-user>` links are not shown in summary
+
+# Information
+
+[Pango format](http://library.gnome.org/devel/pango/stable/PangoMarkupFormat.html) for `tooltip_markup`.
+
+[Gtk::StatusIcon Description](http://ruby-gnome2.sourceforge.jp/hiki.cgi?Gtk%3A%3AStatusIcon).
+
+# Ideas
+
+## Configuration
 
 Сделать более гибким формат конфигурационного файла (чтобы можно было
 например указать только URL, даже без ключа `url:`).
@@ -64,7 +148,38 @@ from. Extractors are major extensions of *livegazer*.
 Возможно сделать возможность указать метод логина и как передавать
 сессию (cookie, get).
 
-Показывать максимально удобно diff. Можно писать лог всех зафиксированных состояний текстов.
+## Extractors
+
+Показывать максимально удобно diff.
+
+Можно пробовать классифицировать посты (заметка, творческий пост,
+фотоотчет и т.п.). Можно просто добавлять пометки "с картинками".
+
+Модели текста:
+
+* Тривиальный - один текст
+* Простой - массив текстов
+* ЖЖ - массив (заголовков, текстов, комментариев)
+* ...
+
+All extractors run in work thread (to not block UI).
+
+В принципе если возвращается не HTML, а например картинка, можно было бы
+тоже отслеживать изменения.
+
+Нужно как-то следить за съезжающим markup-ом, из-за которого появляются
+ошибки в консоли и ничего в тултипе не отрисовывается.
+Учитывая, что отображаются пользовательские данные, это особенно важно.
+
+Можно сохранять состояние (что мы видели).
+
+## Log
+
+Можно писать лог всех зафиксированных состояний текстов.
+
+Реконнекты (по любой причине) лучше писать в лог.
+
+## User interface
 
 Можно сделать различные управляющие воздействия:
 
@@ -82,23 +197,9 @@ from. Extractors are major extensions of *livegazer*.
 например) и показывать, что есть непрочитанное, пока не все посты
 отмечены.
 
-В дальнейшем можно и RSS прикрутить, но скорее всего это лишнее,
-разве что если его использовать только для отслеживания обновления.
-Можно модели текстов и преобразования в модели текстов сделать
-плагинами.
-
-Можно пробовать классифицировать посты (заметка, творческий пост,
-фотоотчет и т.п.). Можно просто добавлять пометки "с картинками".
-
-Модели текста:
-
-* Тривиальный - один текст
-* Простой - массив текстов
-* ЖЖ - массив (заголовков, текстов, комментариев)
-* ...
-
-Выкачивание и вся обработка должны быть в отдельной нити (может быть в
-нескольких нитях).
+Можно сделать отключение отслеживания поста (или по крайней мере
+комментариев). Когда во френдленте пост тысячника (да и не только),
+следить за каждым появляющимся комментарием обычно неинтересно.
 
 Для ЖЖ можно было бы сделать переход по ссылке для написания
 комментария.
@@ -112,123 +213,59 @@ from. Extractors are major extensions of *livegazer*.
 В меню можно перечислять сайты и ставить напротив них галочки.
 И можно щелкать по ним, чтобы настраивать в окошках.
 
-Если будут окошки, то уже пригодится логотип.
+Если будут окошки, то уже пригодится логотип (*livegazer*-а).
 
 Можно вместо стандартного Tooltip показывать свое окошко, с более
 продвинутой версткой.
+
+Можно скроллингом на иконке прокручивать содержимое тултипа.
+
+Если несколько сайтов сразу, то нужно либо несколько иконок в трее,
+либо одну общую. Решил делать несколько иконок, так проще и понятнее.
+
+Можно как-то сообщать также заодно о недоступности серверов.
+Можно показывать, что непосредственно сейчас проверяются обновления.
+
+Можно сделать указание иконок тоже URL-ом.
+
+Можно отдельную команду (щелчком мыши) чтобы проверить новизну сразу, не
+дожидаясь истечения периода.
+
+В текущем варианте *livegazer* не приспособлен для отображения картинок
+в summary, хотя можно попробовать туда поразвиваться.
+
+## Crawler
+
+В дальнейшем можно и RSS прикрутить, но скорее всего это лишнее,
+разве что если его использовать только для отслеживания обновления.
+Можно модели текстов и преобразования в модели текстов сделать
+плагинами.
+
+Each URL fetcher run in separate thread. It's easier than `select`
+especially when HttpClient or similar library is used.
 
 Возможно иногда придется делать перелогиневание.
 
 В ЖЖ без логина есть реклама, а с логином нет (и можно по Last-Modified
 отсекать).
 
-В принципе если возвращается не HTML, а например картинка, можно было бы
-тоже отслеживать изменения.
+Возможно стоит по md5 тоже проверять. Коль скоро crawler предоставляет
+сервис предварительной проверки, это логично. Тем более, что Extractor
+и так перегружен.
 
-Можно скроллингом на иконке прокручивать содержимое тултипа.
+## Miscellaneous
 
-Если несколько сайтов сразу, то нужно либо несколько иконок в трее,
-либо одну общую.
+Сделать установку через gem или как-то ещё.
 
-Можно как-то сообщать также заодно о недоступности серверов.
-
-Нужно как-то следить за съезжающим markup-ом, из-за которого появляются
-ошибки в консоли и ничего в тултипе не отрисовывается.
-Учитывая, что отображаются пользовательские данные, это особенно важно.
-
-Нужно сделать запись в лог. Установку через gem или как-то ещё.
-Настройку. Добавить в репозиторий пример конфига.
 Сделать описание и список доделок для github.
-Придумать лицензию.
 
-Можно сделать указание иконок тоже URL-ом.
+Придумать лицензию.
 
 Возможно отдельный конфиг для сайтов и отдельный для настроек (например
 действия при щелчке мыши).
 
-Можно отдельную команду (щелчком мыши) чтобы проверить новизну сразу, не
-дожидаясь истечения периода.
+Можно сделать вылавливание только информации с ключевыми словами или
+другим образом классифицировнной как интересной.
 
-# Проектирование
 
-## Модули
-
-Скачивание
-
-Работа с данными на основе плагинов (для разных сайтов)
-
-Пользовательский интерфейс
-
-## Действия
-
-Инициализация
-
-Скачивание страницы
-
-    Работает в отдельной нити. Проверяет URL с заданным интервалом.
-    Когда по предварительной проверке (Last-Modified, возможно MD5)
-    видно, что документ возможно обновился, посылает его в очередь
-    для основной нити.
- 
-    Основная нить умеет добавлять и удалять страницы на скачивание.
-    Каждый URL скачивается в своей нити.
-
-Извлечение информации
-
-Сравнение 
-
-Формирование обзора
-
-Обслуживание интерфейса
-
-    Действие при появление новостей
- 
-    Показывание иконки / смена иконки
- 
-    Показывание тултипа
- 
-    Щелчок мыши -- сбрасывание истории
- 
-    Щелчок мыши -- выполнение команды
- 
-    Щелчок мыши -- добавление и настройка новых адресов
-
-## Данные
-
-Накопленная история
-
-## Нити
-
-Для начала по нити на URL, занимаются исключительно скачиванием.
-
-Нить для подготовки данных для пользователя
-
-Основная нить с графическим интерфейсом
-
-# TODO
-
-* Documentation
-    * Config format
-    * Comments
-    * Description (user and developer)
-* Translate to english
-* Handsome site config (probably during program work)
-* Installation procedure
-* First start procedure
-* Надежная загрузка конфигурационного файла
-    * Отсутствие файла
-    * Ошибки формата
-    * Период по умолчанию
-    * Иконки по умолчанию
-    * Отсутствие файлов иконок
-    * Extractor по умолчанию
-
-# BUGS
-
-`<lj-user>`-ы почему-то не показываются
-
-# Информация
-
-[Pango format](http://library.gnome.org/devel/pango/stable/PangoMarkupFormat.html) for `tooltip_markup`.
-
-[Gtk::StatusIcon Description](http://ruby-gnome2.sourceforge.jp/hiki.cgi?Gtk%3A%3AStatusIcon).
+<!--vim: set ft=mkd :-->
