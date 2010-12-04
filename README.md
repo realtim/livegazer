@@ -69,7 +69,7 @@ For now there are some simple extractors:
 * *sub* -- drops scripts and HTML entities also
 * *lj* -- drops ads and some Livejournal special non-important markup
   data
-* *livejournal* -- most thoroughly extractor for livejournal friends
+* *livejournal* -- most thorough extractor for livejournal friends
   pages
 
 # Internal design
